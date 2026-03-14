@@ -3,160 +3,198 @@
 import { useMemo, useState } from "react";
 import { questions } from "../data/questions";
 
+function shuffleArray(arr) {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 export default function Home() {
-  const [search, setSearch] = useState("");
-  const [moduleFilter, setModuleFilter] = useState("All");
-  const [showAnswers, setShowAnswers] = useState({});
-  const [randomMode, setRandomMode] = useState(false);
-  const [examMode, setExamMode] = useState(false);
+  const [started, setStarted] = useState(false);
+  const [randomMode, setRandomMode] = useState(true);
+  const [limit70, setLimit70] = useState(true);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selected, setSelected] = useState(null);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [score, setScore] = useState(0);
+  const [finished, setFinished] = useState(false);
 
-  const modules = useMemo(() => {
-    return ["All", ...new Set(questions.map((q) => q.module))];
-  }, []);
-
-  const filteredQuestions = useMemo(() => {
+  const quizQuestions = useMemo(() => {
     let list = [...questions];
-
-    if (moduleFilter !== "All") {
-      list = list.filter((q) => q.module === moduleFilter);
-    }
-
-    if (search.trim()) {
-      const term = search.toLowerCase();
-      list = list.filter(
-        (q) =>
-          q.question.toLowerCase().includes(term) ||
-          q.answer.toLowerCase().includes(term) ||
-          q.module.toLowerCase().includes(term)
-      );
-    }
-
-    if (randomMode) {
-      list = [...list].sort(() => Math.random() - 0.5);
-    }
-
-    if (examMode) {
-      list = list.slice(0, 70);
-    }
-
+    if (randomMode) list = shuffleArray(list);
+    if (limit70) list = list.slice(0, 70);
     return list;
-  }, [search, moduleFilter, randomMode, examMode]);
+  }, [randomMode, limit70, started]);
 
-  function toggleAnswer(id) {
-    setShowAnswers((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
+  const currentQuestion = quizQuestions[currentIndex];
+
+  function startQuiz() {
+    setStarted(true);
+    setCurrentIndex(0);
+    setSelected(null);
+    setShowFeedback(false);
+    setScore(0);
+    setFinished(false);
   }
 
-  function revealAll() {
-    const all = {};
-    filteredQuestions.forEach((q) => {
-      all[q.id] = true;
-    });
-    setShowAnswers(all);
+  function selectOption(option) {
+    if (showFeedback) return;
+    setSelected(option);
+    setShowFeedback(true);
+    if (option === currentQuestion.answer) {
+      setScore((prev) => prev + 1);
+    }
   }
 
-  function hideAll() {
-    setShowAnswers({});
+  function nextQuestion() {
+    if (currentIndex + 1 < quizQuestions.length) {
+      setCurrentIndex((prev) => prev + 1);
+      setSelected(null);
+      setShowFeedback(false);
+    } else {
+      setFinished(true);
+    }
+  }
+
+  function restartQuiz() {
+    setStarted(false);
+    setCurrentIndex(0);
+    setSelected(null);
+    setShowFeedback(false);
+    setScore(0);
+    setFinished(false);
+  }
+
+  if (!started) {
+    return (
+      <main style={styles.page}>
+        <div style={styles.container}>
+          <div style={styles.hero}>
+            <h1 style={styles.title}>HUM 301 MCQ Practice</h1>
+            <p style={styles.subtitle}>
+              Science, Technology and Human Existence and Society
+            </p>
+            <p style={styles.text}>
+              Total bank: <strong>{questions.length}</strong> questions
+            </p>
+
+            <div style={styles.settings}>
+              <label style={styles.label}>
+                <input
+                  type="checkbox"
+                  checked={randomMode}
+                  onChange={() => setRandomMode((prev) => !prev)}
+                />
+                <span style={styles.labelText}> Randomize questions</span>
+              </label>
+
+              <label style={styles.label}>
+                <input
+                  type="checkbox"
+                  checked={limit70}
+                  onChange={() => setLimit70((prev) => !prev)}
+                />
+                <span style={styles.labelText}> Use 70 question exam mode</span>
+              </label>
+            </div>
+
+            <button style={styles.startButton} onClick={startQuiz}>
+              Start Practice
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (finished) {
+    const percentage = Math.round((score / quizQuestions.length) * 100);
+
+    return (
+      <main style={styles.page}>
+        <div style={styles.container}>
+          <div style={styles.resultCard}>
+            <h1 style={styles.title}>Quiz Completed</h1>
+            <p style={styles.resultText}>
+              Score: <strong>{score}</strong> / <strong>{quizQuestions.length}</strong>
+            </p>
+            <p style={styles.resultText}>
+              Percentage: <strong>{percentage}%</strong>
+            </p>
+            <button style={styles.startButton} onClick={restartQuiz}>
+              Restart
+            </button>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (
     <main style={styles.page}>
       <div style={styles.container}>
-        <div style={styles.header}>
-          <h1 style={styles.title}>HUM 301 Exam Practice</h1>
-          <p style={styles.subtitle}>
-            Science, Technology and Human Existence and Society
-          </p>
-          <p style={styles.small}>
-            Total questions: <strong>{questions.length}</strong>
-          </p>
+        <div style={styles.topBar}>
+          <div>
+            <h1 style={styles.smallTitle}>HUM 301 MCQ Practice</h1>
+            <p style={styles.progressText}>
+              Question {currentIndex + 1} of {quizQuestions.length}
+            </p>
+          </div>
+          <div style={styles.scoreBox}>Score: {score}</div>
         </div>
 
-        <div style={styles.controls}>
-          <input
-            type="text"
-            placeholder="Search questions"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={styles.input}
-          />
+        <div style={styles.card}>
+          <div style={styles.metaRow}>
+            <span style={styles.badge}>{currentQuestion.module}</span>
+          </div>
 
-          <select
-            value={moduleFilter}
-            onChange={(e) => setModuleFilter(e.target.value)}
-            style={styles.select}
-          >
-            {modules.map((module) => (
-              <option key={module} value={module}>
-                {module}
-              </option>
-            ))}
-          </select>
+          <h2 style={styles.question}>{currentQuestion.question}</h2>
 
-          <button
-            onClick={() => setRandomMode((prev) => !prev)}
-            style={styles.button}
-          >
-            {randomMode ? "Stop Random" : "Random Practice"}
-          </button>
+          <div style={styles.optionsWrap}>
+            {currentQuestion.options.map((option, index) => {
+              let buttonStyle = { ...styles.optionButton };
 
-          <button
-            onClick={() => setExamMode((prev) => !prev)}
-            style={styles.button}
-          >
-            {examMode ? "Show Full Bank" : "70 Question Exam Mode"}
-          </button>
+              if (showFeedback) {
+                if (option === currentQuestion.answer) {
+                  buttonStyle = { ...buttonStyle, ...styles.correctOption };
+                } else if (option === selected && option !== currentQuestion.answer) {
+                  buttonStyle = { ...buttonStyle, ...styles.wrongOption };
+                }
+              }
 
-          <button onClick={revealAll} style={styles.button}>
-            Reveal All
-          </button>
+              return (
+                <button
+                  key={index}
+                  style={buttonStyle}
+                  onClick={() => selectOption(option)}
+                >
+                  {String.fromCharCode(65 + index)}. {option}
+                </button>
+              );
+            })}
+          </div>
 
-          <button onClick={hideAll} style={styles.buttonDark}>
-            Hide All
-          </button>
-        </div>
-
-        <p style={styles.count}>
-          Showing <strong>{filteredQuestions.length}</strong> question(s)
-        </p>
-
-        <div style={styles.list}>
-          {filteredQuestions.map((item, index) => (
-            <div key={item.id} style={styles.card}>
-              <div style={styles.meta}>
-                <span>#{index + 1}</span>
-                <span>{item.module}</span>
-                <span>{item.type.toUpperCase()}</span>
-              </div>
-
-              <h3 style={styles.question}>{item.question}</h3>
-
-              {item.type === "mcq" && item.options && (
-                <div style={styles.options}>
-                  {item.options.map((option, i) => (
-                    <div key={i} style={styles.option}>
-                      {String.fromCharCode(65 + i)}. {option}
-                    </div>
-                  ))}
-                </div>
+          {showFeedback && (
+            <div style={styles.feedbackBox}>
+              {selected === currentQuestion.answer ? (
+                <p style={styles.correctText}>Correct</p>
+              ) : (
+                <>
+                  <p style={styles.wrongText}>Wrong</p>
+                  <p style={styles.answerText}>
+                    Correct answer: <strong>{currentQuestion.answer}</strong>
+                  </p>
+                </>
               )}
 
-              <button
-                onClick={() => toggleAnswer(item.id)}
-                style={styles.answerButton}
-              >
-                {showAnswers[item.id] ? "Hide Answer" : "Show Answer"}
+              <button style={styles.nextButton} onClick={nextQuestion}>
+                {currentIndex + 1 === quizQuestions.length ? "Finish Quiz" : "Next Question"}
               </button>
-
-              {showAnswers[item.id] && (
-                <div style={styles.answer}>
-                  <strong>Answer:</strong> {item.answer}
-                </div>
-              )}
             </div>
-          ))}
+          )}
         </div>
       </div>
     </main>
@@ -165,126 +203,165 @@ export default function Home() {
 
 const styles = {
   page: {
-    background: "#f4f7fb",
     minHeight: "100vh",
-    padding: "24px",
+    background: "#f3f4f6",
     fontFamily: "Arial, sans-serif",
+    padding: "20px",
   },
   container: {
-    maxWidth: "1100px",
+    maxWidth: "900px",
     margin: "0 auto",
   },
-  header: {
-    background: "#0f172a",
+  hero: {
+    background: "#111827",
     color: "white",
-    padding: "24px",
-    borderRadius: "16px",
-    marginBottom: "20px",
+    borderRadius: "20px",
+    padding: "28px",
+    marginTop: "30px",
   },
   title: {
     margin: 0,
     fontSize: "32px",
   },
   subtitle: {
-    marginTop: "8px",
-    marginBottom: "8px",
+    marginTop: "10px",
+    fontSize: "16px",
+    opacity: 0.95,
+  },
+  text: {
+    marginTop: "16px",
     fontSize: "16px",
   },
-  small: {
-    margin: 0,
-    opacity: 0.9,
-  },
-  controls: {
+  settings: {
+    marginTop: "20px",
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
     gap: "12px",
-    marginBottom: "18px",
   },
-  input: {
-    padding: "12px",
-    borderRadius: "10px",
-    border: "1px solid #cbd5e1",
-    fontSize: "15px",
+  label: {
+    fontSize: "16px",
   },
-  select: {
-    padding: "12px",
-    borderRadius: "10px",
-    border: "1px solid #cbd5e1",
-    fontSize: "15px",
+  labelText: {
+    marginLeft: "8px",
   },
-  button: {
-    padding: "12px",
-    borderRadius: "10px",
+  startButton: {
+    marginTop: "24px",
+    padding: "14px 18px",
     border: "none",
+    borderRadius: "12px",
     background: "#2563eb",
     color: "white",
-    cursor: "pointer",
     fontWeight: "bold",
-  },
-  buttonDark: {
-    padding: "12px",
-    borderRadius: "10px",
-    border: "none",
-    background: "#1e293b",
-    color: "white",
+    fontSize: "16px",
     cursor: "pointer",
-    fontWeight: "bold",
   },
-  count: {
-    fontSize: "15px",
+  resultCard: {
+    background: "white",
+    borderRadius: "20px",
+    padding: "28px",
+    marginTop: "30px",
+    textAlign: "center",
+  },
+  resultText: {
+    fontSize: "20px",
+    marginTop: "12px",
+  },
+  topBar: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "12px",
+    alignItems: "center",
     marginBottom: "16px",
+    flexWrap: "wrap",
   },
-  list: {
-    display: "grid",
-    gap: "16px",
+  smallTitle: {
+    margin: 0,
+    fontSize: "24px",
+  },
+  progressText: {
+    margin: "8px 0 0 0",
+    color: "#4b5563",
+  },
+  scoreBox: {
+    background: "#111827",
+    color: "white",
+    padding: "12px 16px",
+    borderRadius: "12px",
+    fontWeight: "bold",
   },
   card: {
     background: "white",
-    borderRadius: "14px",
-    padding: "18px",
-    border: "1px solid #e2e8f0",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+    borderRadius: "20px",
+    padding: "24px",
+    boxShadow: "0 4px 18px rgba(0,0,0,0.08)",
   },
-  meta: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "10px",
-    fontSize: "12px",
-    color: "#475569",
-    marginBottom: "10px",
-  },
-  question: {
-    marginTop: 0,
-    fontSize: "18px",
-    color: "#0f172a",
-  },
-  options: {
-    display: "grid",
-    gap: "8px",
+  metaRow: {
     marginBottom: "12px",
   },
-  option: {
-    background: "#f8fafc",
-    padding: "10px",
-    borderRadius: "8px",
-    border: "1px solid #e2e8f0",
-  },
-  answerButton: {
-    padding: "10px 14px",
-    borderRadius: "8px",
-    border: "none",
-    background: "#0ea5e9",
-    color: "white",
-    cursor: "pointer",
+  badge: {
+    background: "#dbeafe",
+    color: "#1d4ed8",
+    padding: "8px 12px",
+    borderRadius: "999px",
+    fontSize: "13px",
     fontWeight: "bold",
-    marginTop: "8px",
   },
-  answer: {
-    marginTop: "12px",
-    background: "#eff6ff",
-    border: "1px solid #bfdbfe",
-    padding: "12px",
-    borderRadius: "10px",
-    lineHeight: 1.6,
+  question: {
+    fontSize: "24px",
+    lineHeight: 1.4,
+    marginBottom: "20px",
+  },
+  optionsWrap: {
+    display: "grid",
+    gap: "12px",
+  },
+  optionButton: {
+    textAlign: "left",
+    padding: "16px",
+    borderRadius: "14px",
+    border: "1px solid #d1d5db",
+    background: "#f9fafb",
+    cursor: "pointer",
+    fontSize: "16px",
+  },
+  correctOption: {
+    background: "#dcfce7",
+    border: "1px solid #22c55e",
+  },
+  wrongOption: {
+    background: "#fee2e2",
+    border: "1px solid #ef4444",
+  },
+  feedbackBox: {
+    marginTop: "22px",
+    padding: "18px",
+    borderRadius: "14px",
+    background: "#f8fafc",
+  },
+  correctText: {
+    color: "#15803d",
+    fontWeight: "bold",
+    fontSize: "18px",
+    margin: 0,
+  },
+  wrongText: {
+    color: "#b91c1c",
+    fontWeight: "bold",
+    fontSize: "18px",
+    margin: 0,
+  },
+  answerText: {
+    marginTop: "10px",
+    fontSize: "16px",
+  },
+  nextButton: {
+    marginTop: "16px",
+    padding: "12px 16px",
+    border: "none",
+    borderRadius: "12px",
+    background: "#0f172a",
+    color: "white",
+    fontWeight: "bold",
+    cursor: "pointer",
+    fontSize: "15px",
   },
 };
