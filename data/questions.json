@@ -1,5 +1,4 @@
 export const questions = [
-  // INTRODUCTION TO SCIENCE
   {
     id: 1,
     module: "Introduction to Science",
